@@ -45,7 +45,7 @@ class DominantColorsResource(object):
             with io.BytesIO(r.content) as f:
                 with Image.open(f) as img:
                     img = cv2.resize(np.array(img), (224, 224), interpolation=cv2.INTER_CUBIC)
-                    img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+                    img = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
 
             channels = [0, 1, 2]
             mask = None
