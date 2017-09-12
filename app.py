@@ -36,6 +36,7 @@ class DominantColorsResource(object):
     def on_get(self, req, resp):
         url = req.get_param('url') or ''
         ncolors = req.get_param_as_int('ncolors') or 4
+        format = req.get_param('format') or 'json'
 
         try:
             r = requests.get(url)
@@ -102,7 +103,17 @@ class DominantColorsResource(object):
             colors = [matplotlib.colors.hsv_to_rgb([x[0] / 180.0, x[1] / 256.0, x[2] / 256.0]) for x in dominants]
             colors = [matplotlib.colors.to_hex([x[0], x[1], x[2]]) for x in colors]
 
-            result = json.dumps({'colors': np.array(colors).tolist()})
+            if format == 'json':
+                result = json.dumps({'colors': np.array(colors).tolist()})
+                resp.content_type = falcon.MEDIA_JSON
+            else:
+                result = '<html>\n<body>\n'
+                for x in colors:
+                    result += '<div style="font-family: monospace; background: ' + x + ';'\
+                              'padding: 1em">' + x +\
+                              '</div>\n'
+                result += '</body>\n</html>'
+                resp.content_type = falcon.MEDIA_HTML
         except Exception as ex:
             logger.error(ex)
 
