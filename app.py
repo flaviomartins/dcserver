@@ -77,7 +77,7 @@ class DominantColorsResource(object):
             n_centroids = ncolors
             num_colors = ncolors
 
-            km = KMeans(n_centroids, random_state=0)
+            km = KMeans(n_clusters=n_centroids, init='k-means++', n_init=5, random_state=0)
             clusters = km.fit_predict(ar)
             centroids = km.cluster_centers_
 
