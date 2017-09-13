@@ -44,7 +44,7 @@ class DominantColorsResource(object):
             r.raw.decode_content = True
             with io.BytesIO(r.content) as f:
                 with Image.open(f) as img:
-                    img = cv2.resize(np.array(img), (224, 224), interpolation=cv2.INTER_CUBIC)
+                    img = cv2.resize(np.array(img), (224, 224), interpolation=cv2.INTER_AREA)
                     img = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
 
             channels = [0, 1, 2]
@@ -91,7 +91,7 @@ class DominantColorsResource(object):
                 members_weights = hist_weights[np.where(clusters == i)]
                 distances = euclidean_distances(c_i, members)
                 index = np.argmax(alpha * members_weights + (1 - alpha) * (
-                    (1. / distances) + members[:, 1] / 255.0 + members[:, 2] / 255.0))
+                    (1. / distances) + members[:, 1] / 256.0 + members[:, 2] / 256.0))
                 d_i = members[index]
                 dominants[i, :] = d_i
                 counts[i] = quantize(hist, d_i)
