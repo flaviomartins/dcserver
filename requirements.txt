@@ -6,5 +6,6 @@ opencv-python
 matplotlib
 numpy
 scipy
+scikit-image
 scikit-learn
 requests
