@@ -39,8 +39,32 @@ class DominantColorsResource(object):
         img = cv2.resize(np.array(img), (224, 224), interpolation=cv2.INTER_AREA)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
 
+        channels = [0, 1, 2]
+        mask = None
+
+        histSize = [HIST_BINS, HIST_BINS, HIST_BINS]
+        hranges = [0, 256]
+        sranges = [0, 256]
+        vranges = [0, 256]
+        ranges = [item for sublist in [hranges, sranges, vranges] for item in sublist]
+
+        hist = cv2.calcHist([img], channels, mask, histSize, ranges)
+
+        # normalize hist to 0-1 range
+        min_max_scaler = preprocessing.MinMaxScaler(feature_range=(0, 1))
+        norm_hist = min_max_scaler.fit_transform(hist.ravel().reshape(-1, 1))
+        norm_hist = np.reshape(norm_hist, (HIST_BINS, HIST_BINS, HIST_BINS))
+
         # make img array for kmeans
         ar = img.reshape(-1, 3)
+
+        def quantize(hist, x):
+            h = np.floor(x[0] / 256.0 * HIST_BINS).astype(int)
+            s = np.floor(x[1] / 256.0 * HIST_BINS).astype(int)
+            v = np.floor(x[2] / 256.0 * HIST_BINS).astype(int)
+            return hist[h, s, v]
+
+        hist_weights = np.apply_along_axis(lambda x: quantize(norm_hist, x), 1, ar)
 
         n_centroids = ncolors
         num_colors = ncolors
@@ -49,12 +73,20 @@ class DominantColorsResource(object):
         clusters = km.fit_predict(ar)
         centroids = km.cluster_centers_
 
+        alpha = 0.5
         dominants = np.zeros((n_centroids, 3))
         counts = np.zeros(n_centroids)
 
         for i, centroid in enumerate(centroids):
-            dominants[i, :] = centroid
-            counts[i] = np.count_nonzero(clusters == i)
+            c_i = np.reshape(centroid, (1, 3))
+            members = ar[np.where(clusters == i)]
+            members_weights = hist_weights[np.where(clusters == i)]
+            distances = euclidean_distances(c_i, members)
+            index = np.argmax(alpha * members_weights + (1 - alpha) * (
+                (1. / distances) + members[:, 0] / 256.0))
+            d_i = members[index]
+            dominants[i, :] = d_i
+            counts[i] = quantize(hist, d_i)
 
         dominants = dominants[np.argsort(counts, axis=0)[::-1]][:num_colors]
 
