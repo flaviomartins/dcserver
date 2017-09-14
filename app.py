@@ -122,7 +122,12 @@ class DominantColorsResource(object):
 
         dominants = dominants[np.argsort(counts, axis=0)[::-1]][:num_colors]
 
-        colors = [hsv2rgb([[[x[0] / 180.0, x[1] / 256.0, x[2] / 256.0]]])[0][0] for x in dominants]
+        # rescale
+        dominants[:, 0] /= 180.0
+        dominants[:, 1] /= 256.0
+        dominants[:, 2] /= 256.0
+
+        colors = [hsv2rgb([[x]])[0][0] for x in dominants]
         return colors
 
     def on_get(self, req, resp):
