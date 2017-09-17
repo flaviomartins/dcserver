@@ -56,7 +56,7 @@ class DominantColorsResource(object):
         ranges = [item for sublist in [hranges, sranges, vranges] for item in sublist]
 
         hist = cv2.calcHist([img], channels, mask, histSize, ranges)
-        norm_hist = cv2.normalize(hist, hist, 0, 1, cv2.NORM_MINMAX)
+        cv2.normalize(hist, hist, 0, 1, cv2.NORM_MINMAX)
 
         # make img array for kmeans
         ar = img.reshape(-1, 3)
@@ -67,7 +67,7 @@ class DominantColorsResource(object):
             v = np.floor(x[2] / 256.0 * HIST_BINS).astype(int)
             return hist[h, s, v]
 
-        hist_weights = np.apply_along_axis(lambda x: quantize(norm_hist, x), 1, ar)
+        hist_weights = np.apply_along_axis(lambda x: quantize(hist, x), 1, ar)
 
         n_centroids = ncolors
         num_colors = ncolors
@@ -116,7 +116,7 @@ class DominantColorsResource(object):
         ranges = [item for sublist in [hranges, sranges, vranges] for item in sublist]
 
         hist = cv2.calcHist([img], channels, mask, histSize, ranges)
-        norm_hist = cv2.normalize(hist, hist, 0, 1, cv2.NORM_MINMAX)
+        cv2.normalize(hist, hist, 0, 1, cv2.NORM_MINMAX)
 
         # make img array for kmeans
         ar = img.reshape(-1, 3)
@@ -127,7 +127,7 @@ class DominantColorsResource(object):
             v = np.floor(x[2] / 256.0 * HIST_BINS).astype(int)
             return hist[h, s, v]
 
-        hist_weights = np.apply_along_axis(lambda x: quantize(norm_hist, x), 1, ar)
+        hist_weights = np.apply_along_axis(lambda x: quantize(hist, x), 1, ar)
 
         n_centroids = ncolors
         num_colors = ncolors
