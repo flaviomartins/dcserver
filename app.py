@@ -44,16 +44,16 @@ class DominantColorsResource(object):
     @staticmethod
     def lab_method(img, ncolors):
         img = cv2.resize(np.array(img), (224, 224), interpolation=cv2.INTER_AREA)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
 
         channels = [0, 1, 2]
         mask = None
 
         histSize = [HIST_BINS, HIST_BINS, HIST_BINS]
-        hranges = [0, 256]
-        sranges = [0, 256]
-        vranges = [0, 256]
-        ranges = [item for sublist in [hranges, sranges, vranges] for item in sublist]
+        lranges = [0, 256]
+        aranges = [0, 256]
+        branges = [0, 256]
+        ranges = [item for sublist in [lranges, aranges, branges] for item in sublist]
 
         hist = cv2.calcHist([img], channels, mask, histSize, ranges)
         cv2.normalize(hist, hist, 0, 1, cv2.NORM_MINMAX)
@@ -62,10 +62,10 @@ class DominantColorsResource(object):
         ar = img.reshape(-1, 3)
 
         def lab_quantize(hist, x):
-            h = np.floor(x[0] / 256.0 * HIST_BINS).astype(int)
-            s = np.floor(x[1] / 256.0 * HIST_BINS).astype(int)
-            v = np.floor(x[2] / 256.0 * HIST_BINS).astype(int)
-            return hist[h, s, v]
+            l = np.floor(x[0] / 256.0 * HIST_BINS).astype(int)
+            a = np.floor(x[1] / 256.0 * HIST_BINS).astype(int)
+            b = np.floor(x[2] / 256.0 * HIST_BINS).astype(int)
+            return hist[l, a, b]
 
         hist_weights = np.apply_along_axis(lambda x: lab_quantize(hist, x), 1, ar)
 
@@ -86,7 +86,7 @@ class DominantColorsResource(object):
             members_weights = hist_weights[np.where(clusters == i)]
             distances = euclidean_distances(c_i, members)
             index = np.argmax(alpha * members_weights + (1 - alpha) * (
-                (1. / distances) + members[:, 0] / 256.0))
+                (1. / distances)))
             d_i = members[index]
             dominants[i, :] = d_i
             counts[i] = lab_quantize(hist, d_i)
