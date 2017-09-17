@@ -61,13 +61,13 @@ class DominantColorsResource(object):
         # make img array for kmeans
         ar = img.reshape(-1, 3)
 
-        def quantize(hist, x):
+        def lab_quantize(hist, x):
             h = np.floor(x[0] / 256.0 * HIST_BINS).astype(int)
             s = np.floor(x[1] / 256.0 * HIST_BINS).astype(int)
             v = np.floor(x[2] / 256.0 * HIST_BINS).astype(int)
             return hist[h, s, v]
 
-        hist_weights = np.apply_along_axis(lambda x: quantize(hist, x), 1, ar)
+        hist_weights = np.apply_along_axis(lambda x: lab_quantize(hist, x), 1, ar)
 
         n_centroids = ncolors
         num_colors = ncolors
@@ -89,7 +89,7 @@ class DominantColorsResource(object):
                 (1. / distances) + members[:, 0] / 256.0))
             d_i = members[index]
             dominants[i, :] = d_i
-            counts[i] = quantize(hist, d_i)
+            counts[i] = lab_quantize(hist, d_i)
 
         dominants = dominants[np.argsort(counts, axis=0)[::-1]][:num_colors]
 
@@ -121,13 +121,13 @@ class DominantColorsResource(object):
         # make img array for kmeans
         ar = img.reshape(-1, 3)
 
-        def quantize(hist, x):
+        def hsv_quantize(hist, x):
             h = np.floor(x[0] / 180.0 * HIST_BINS).astype(int)
             s = np.floor(x[1] / 256.0 * HIST_BINS).astype(int)
             v = np.floor(x[2] / 256.0 * HIST_BINS).astype(int)
             return hist[h, s, v]
 
-        hist_weights = np.apply_along_axis(lambda x: quantize(hist, x), 1, ar)
+        hist_weights = np.apply_along_axis(lambda x: hsv_quantize(hist, x), 1, ar)
 
         n_centroids = ncolors
         num_colors = ncolors
@@ -149,7 +149,7 @@ class DominantColorsResource(object):
                 (1. / distances) + members[:, 1] / 256.0 + members[:, 2] / 256.0))
             d_i = members[index]
             dominants[i, :] = d_i
-            counts[i] = quantize(hist, d_i)
+            counts[i] = hsv_quantize(hist, d_i)
 
         dominants = dominants[np.argsort(counts, axis=0)[::-1]][:num_colors]
 
