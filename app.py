@@ -85,8 +85,14 @@ class DominantColorsResource(object):
             members = ar[np.where(clusters == i)]
             members_weights = hist_weights[np.where(clusters == i)]
             distances = euclidean_distances(c_i, members)
-            index = np.argmax(alpha * members_weights + (1 - alpha) * (
-                (1. / distances)))
+            index = np.argmax(
+                alpha * (
+                    members_weights
+                )
+                + (1 - alpha) * (
+                    (1. / distances)
+                )
+            )
             d_i = members[index]
             dominants[i, :] = d_i
             counts[i] = lab_quantize(hist, d_i)
@@ -94,7 +100,7 @@ class DominantColorsResource(object):
         dominants = dominants[np.argsort(counts, axis=0)[::-1]][:num_colors]
 
         # rescale
-        dominants[:, 0] *= 100/255.0
+        dominants[:, 0] *= 100 / 255.0
         dominants[:, 1] -= 128
         dominants[:, 2] -= 128
 
@@ -145,8 +151,14 @@ class DominantColorsResource(object):
             members = ar[np.where(clusters == i)]
             members_weights = hist_weights[np.where(clusters == i)]
             distances = euclidean_distances(c_i, members)
-            index = np.argmax(alpha * members_weights + (1 - alpha) * (
-                (1. / distances) + members[:, 1] / 256.0 + members[:, 2] / 256.0))
+            index = np.argmax(
+                alpha * (
+                    members_weights
+                )
+                + (1 - alpha) * (
+                    (1. / distances)
+                )
+            )
             d_i = members[index]
             dominants[i, :] = d_i
             counts[i] = hsv_quantize(hist, d_i)
@@ -165,7 +177,7 @@ class DominantColorsResource(object):
         url = req.get_param('url') or ''
         ncolors = req.get_param_as_int('ncolors') or 4
         format = req.get_param('format') or 'json'
-        mode = req.get_param('mode') or 'hsv'
+        mode = req.get_param('mode') or 'lab'
 
         try:
             r = requests.get(url)
@@ -186,8 +198,8 @@ class DominantColorsResource(object):
             else:
                 result = '<html>\n<body>\n'
                 for x in colors:
-                    result += '<div style="font-family: monospace; background: ' + x + ';'\
-                              'padding: 1em">' + x +\
+                    result += '<div style="font-family: monospace; background: ' + x + ';' \
+                                                                                       'padding: 1em">' + x + \
                               '</div>\n'
                 result += '</body>\n</html>'
                 resp.content_type = falcon.MEDIA_HTML
