@@ -12,7 +12,6 @@ from PIL import Image
 from skimage.color import lab2rgb, hsv2rgb
 import cv2
 
-from sklearn import preprocessing
 from sklearn.cluster import KMeans
 from sklearn.metrics.pairwise import euclidean_distances
 
@@ -57,11 +56,7 @@ class DominantColorsResource(object):
         ranges = [item for sublist in [hranges, sranges, vranges] for item in sublist]
 
         hist = cv2.calcHist([img], channels, mask, histSize, ranges)
-
-        # normalize hist to 0-1 range
-        min_max_scaler = preprocessing.MinMaxScaler(feature_range=(0, 1))
-        norm_hist = min_max_scaler.fit_transform(hist.ravel().reshape(-1, 1))
-        norm_hist = np.reshape(norm_hist, (HIST_BINS, HIST_BINS, HIST_BINS))
+        norm_hist = cv2.normalize(hist, hist, 0, 1, cv2.NORM_MINMAX)
 
         # make img array for kmeans
         ar = img.reshape(-1, 3)
@@ -103,7 +98,7 @@ class DominantColorsResource(object):
         dominants[:, 1] -= 128
         dominants[:, 2] -= 128
 
-        colors = [lab2rgb([[[x[0], x[1], x[2]]]])[0][0] for x in dominants]
+        colors = [lab2rgb([[x]])[0][0] for x in dominants]
         return colors
 
     @staticmethod
@@ -121,11 +116,7 @@ class DominantColorsResource(object):
         ranges = [item for sublist in [hranges, sranges, vranges] for item in sublist]
 
         hist = cv2.calcHist([img], channels, mask, histSize, ranges)
-
-        # normalize hist to 0-1 range
-        min_max_scaler = preprocessing.MinMaxScaler(feature_range=(0, 1))
-        norm_hist = min_max_scaler.fit_transform(hist.ravel().reshape(-1, 1))
-        norm_hist = np.reshape(norm_hist, (HIST_BINS, HIST_BINS, HIST_BINS))
+        norm_hist = cv2.normalize(hist, hist, 0, 1, cv2.NORM_MINMAX)
 
         # make img array for kmeans
         ar = img.reshape(-1, 3)
