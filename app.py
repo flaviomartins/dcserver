@@ -11,7 +11,6 @@ import numpy as np
 from PIL import Image
 from skimage.color import lab2rgb, hsv2rgb
 import cv2
-import matplotlib
 
 from sklearn import preprocessing
 from sklearn.cluster import KMeans
@@ -28,6 +27,15 @@ class CorsMiddleware(object):
         origin = request.get_header('Origin')
         if '*' in ALLOWED_ORIGINS or origin in ALLOWED_ORIGINS:
             response.set_header('Access-Control-Allow-Origin', origin)
+
+
+# snipped from matplotlib
+def rgb2hex(c):
+    """Convert `c` to a hex color.
+    Uses the #rrggbb format.
+    """
+    return "#" + "".join(format(int(np.round(val * 255)), "02x")
+                         for val in c)
 
 
 class DominantColorsResource(object):
@@ -179,7 +187,7 @@ class DominantColorsResource(object):
                 else:
                     colors = self.hsv_method(img, ncolors)
 
-            colors = [matplotlib.colors.to_hex([x[0], x[1], x[2]]) for x in colors]
+            colors = [rgb2hex(x) for x in colors]
 
             if format == 'json':
                 result = json.dumps({'colors': np.array(colors).tolist()})
