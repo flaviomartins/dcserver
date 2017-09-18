@@ -42,7 +42,7 @@ class DominantColorsResource(object):
         pass
 
     @staticmethod
-    def lab_method(img, ncolors):
+    def lab_method(img, ncenters, ncolors):
         img = cv2.resize(np.array(img), (224, 224), interpolation=cv2.INTER_AREA)
         img = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
 
@@ -69,7 +69,7 @@ class DominantColorsResource(object):
 
         hist_weights = np.apply_along_axis(lambda x: lab_quantize(hist, x), 1, ar)
 
-        n_centroids = ncolors
+        n_centroids = ncenters if ncenters > ncolors else ncolors
         num_colors = ncolors
 
         km = KMeans(n_clusters=n_centroids, init='k-means++', n_init=5, random_state=0)
@@ -108,7 +108,7 @@ class DominantColorsResource(object):
         return colors
 
     @staticmethod
-    def hsv_method(img, ncolors):
+    def hsv_method(img, ncenters, ncolors):
         img = cv2.resize(np.array(img), (224, 224), interpolation=cv2.INTER_AREA)
         img = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
 
@@ -135,7 +135,7 @@ class DominantColorsResource(object):
 
         hist_weights = np.apply_along_axis(lambda x: hsv_quantize(hist, x), 1, ar)
 
-        n_centroids = ncolors
+        n_centroids = ncenters if ncenters > ncolors else ncolors
         num_colors = ncolors
 
         km = KMeans(n_clusters=n_centroids, init='k-means++', n_init=5, random_state=0)
@@ -176,6 +176,7 @@ class DominantColorsResource(object):
     def on_get(self, req, resp):
         url = req.get_param('url') or ''
         ncolors = req.get_param_as_int('ncolors') or 4
+        ncenters = req.get_param_as_int('ncenters') or ncolors
         format = req.get_param('format') or 'json'
         mode = req.get_param('mode') or 'lab'
 
@@ -186,9 +187,9 @@ class DominantColorsResource(object):
             with io.BytesIO(r.content) as f:
                 img = Image.open(f)
                 if mode == 'lab':
-                    colors = self.lab_method(img, ncolors)
+                    colors = self.lab_method(img, ncenters, ncolors)
                 else:
-                    colors = self.hsv_method(img, ncolors)
+                    colors = self.hsv_method(img, ncenters, ncolors)
 
             colors = [rgb2hex(x) for x in colors]
 
