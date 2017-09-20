@@ -12,8 +12,8 @@ from PIL import Image
 from skimage.color import lab2rgb, hsv2rgb
 import cv2
 
-from sklearn.cluster import KMeans, MiniBatchKMeans
-from sklearn.metrics.pairwise import euclidean_distances
+from sklearn.cluster import MiniBatchKMeans
+from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +54,9 @@ class DominantColorsResource(object):
         km = MiniBatchKMeans(n_clusters=n_clusters, init='k-means++', n_init=3, random_state=0)
         labels = km.fit_predict(X)
         cluster_centers = km.cluster_centers_
-
         bincount = np.bincount(labels)
+
+        # sort colors by frequency
         dominants = cluster_centers[np.argsort(bincount, axis=0)[::-1]][:n_colors]
 
         # rescale
@@ -67,63 +68,25 @@ class DominantColorsResource(object):
         return colors
 
     @staticmethod
-    def hsv_method(img, nclusters, ncolors):
+    def hsv_method(img, n_clusters, n_colors):
         img = np.array(img)
         img = cv2.resize(img, (224, 224), interpolation=cv2.INTER_AREA)
         img = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
 
-        channels = [0, 1, 2]
-        mask = None
-
-        histSize = [HIST_BINS, HIST_BINS, HIST_BINS]
-        hranges = [0, 180]
-        sranges = [0, 256]
-        vranges = [0, 256]
-        ranges = [item for sublist in [hranges, sranges, vranges] for item in sublist]
-
-        hist = cv2.calcHist([img], channels, mask, histSize, ranges)
-        cv2.normalize(hist, hist, 0, 1, cv2.NORM_MINMAX)
-
         # make img array for kmeans
         X = img.reshape(-1, 3)
 
-        def hsv_quantize(hist, x):
-            h = np.floor(x[0] / 180.0 * HIST_BINS).astype(int)
-            s = np.floor(x[1] / 256.0 * HIST_BINS).astype(int)
-            v = np.floor(x[2] / 256.0 * HIST_BINS).astype(int)
-            return hist[h, s, v]
-
-        hist_weights = np.apply_along_axis(lambda x: hsv_quantize(hist, x), 1, X)
-
-        n_centroids = nclusters if nclusters > ncolors else ncolors
-        n_colors = ncolors
-
-        km = KMeans(n_clusters=n_centroids, init='k-means++', n_init=5, random_state=0)
+        n_clusters = n_clusters if n_clusters > n_colors else n_colors
+        km = MiniBatchKMeans(n_clusters=n_clusters, init='k-means++', n_init=3, random_state=0)
         labels = km.fit_predict(X)
         cluster_centers = km.cluster_centers_
+        bincount = np.bincount(labels)
 
-        alpha = 0.5
-        dominants = np.zeros((n_centroids, 3))
-        counts = np.zeros(n_centroids)
+        # find index of data point closest to each center
+        closest, _ = pairwise_distances_argmin_min(cluster_centers, X)
 
-        for i, centroid in enumerate(cluster_centers):
-            c_i = np.reshape(centroid, (1, 3))
-            members = X[np.where(labels == i)]
-            members_weights = hist_weights[np.where(labels == i)]
-            distances = euclidean_distances(c_i, members)
-            index = np.argmax(
-                alpha * (
-                    members_weights
-                )
-                + (1 - alpha) * (
-                    (1. / distances)
-                )
-            )
-            d_i = members[index]
-            dominants[i, :] = d_i
-            counts[i] = hsv_quantize(hist, d_i)
-
-        dominants = dominants[np.argsort(counts, axis=0)[::-1]][:n_colors]
+        # sort colors by frequency
+        dominants = 1. * X[closest][np.argsort(bincount, axis=0)[::-1]][:n_colors]
 
         # rescale
         dominants[:, 0] /= 180.0
