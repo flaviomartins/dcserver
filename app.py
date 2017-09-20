@@ -12,7 +12,7 @@ from PIL import Image
 from skimage.color import lab2rgb, hsv2rgb
 import cv2
 
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans, MiniBatchKMeans
 from sklearn.metrics.pairwise import euclidean_distances
 
 logger = logging.getLogger(__name__)
@@ -42,62 +42,21 @@ class DominantColorsResource(object):
         pass
 
     @staticmethod
-    def lab_method(img, nclusters, ncolors):
-        img = cv2.resize(np.array(img), (224, 224), interpolation=cv2.INTER_AREA)
+    def lab_method(img, n_clusters, n_colors):
+        img = np.array(img)
+        img = cv2.resize(img, (224, 224), interpolation=cv2.INTER_AREA)
         img = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
-
-        channels = [0, 1, 2]
-        mask = None
-
-        histSize = [HIST_BINS, HIST_BINS, HIST_BINS]
-        lranges = [0, 256]
-        aranges = [0, 256]
-        branges = [0, 256]
-        ranges = [item for sublist in [lranges, aranges, branges] for item in sublist]
-
-        hist = cv2.calcHist([img], channels, mask, histSize, ranges)
-        cv2.normalize(hist, hist, 0, 1, cv2.NORM_MINMAX)
 
         # make img array for kmeans
         X = img.reshape(-1, 3)
 
-        def lab_quantize(hist, x):
-            l = np.floor(x[0] / 256.0 * HIST_BINS).astype(int)
-            a = np.floor(x[1] / 256.0 * HIST_BINS).astype(int)
-            b = np.floor(x[2] / 256.0 * HIST_BINS).astype(int)
-            return hist[l, a, b]
-
-        hist_weights = np.apply_along_axis(lambda x: lab_quantize(hist, x), 1, X)
-
-        n_clusters = nclusters if nclusters > ncolors else ncolors
-        n_colors = ncolors
-
-        km = KMeans(n_clusters=n_clusters, init='k-means++', n_init=5, random_state=0)
+        n_clusters = n_clusters if n_clusters > n_colors else n_colors
+        km = MiniBatchKMeans(n_clusters=n_clusters, init='k-means++', n_init=3, random_state=0)
         labels = km.fit_predict(X)
         cluster_centers = km.cluster_centers_
 
-        alpha = 0.5
-        dominants = np.zeros((n_clusters, 3))
-        counts = np.zeros(n_clusters)
-
-        for i, centroid in enumerate(cluster_centers):
-            c_i = np.reshape(centroid, (1, 3))
-            members = X[np.where(labels == i)]
-            members_weights = hist_weights[np.where(labels == i)]
-            distances = euclidean_distances(c_i, members)
-            index = np.argmax(
-                alpha * (
-                    members_weights
-                )
-                + (1 - alpha) * (
-                    (1. / distances)
-                )
-            )
-            d_i = members[index]
-            dominants[i, :] = d_i
-            counts[i] = lab_quantize(hist, d_i)
-
-        dominants = dominants[np.argsort(counts, axis=0)[::-1]][:n_colors]
+        bincount = np.bincount(labels)
+        dominants = cluster_centers[np.argsort(bincount, axis=0)[::-1]][:n_colors]
 
         # rescale
         dominants[:, 0] *= 100 / 255.0
@@ -109,7 +68,8 @@ class DominantColorsResource(object):
 
     @staticmethod
     def hsv_method(img, nclusters, ncolors):
-        img = cv2.resize(np.array(img), (224, 224), interpolation=cv2.INTER_AREA)
+        img = np.array(img)
+        img = cv2.resize(img, (224, 224), interpolation=cv2.INTER_AREA)
         img = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
 
         channels = [0, 1, 2]
