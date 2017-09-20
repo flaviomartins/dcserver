@@ -42,7 +42,7 @@ class DominantColorsResource(object):
         pass
 
     @staticmethod
-    def lab_method(img, ncenters, ncolors):
+    def lab_method(img, nclusters, ncolors):
         img = cv2.resize(np.array(img), (224, 224), interpolation=cv2.INTER_AREA)
         img = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
 
@@ -59,7 +59,7 @@ class DominantColorsResource(object):
         cv2.normalize(hist, hist, 0, 1, cv2.NORM_MINMAX)
 
         # make img array for kmeans
-        ar = img.reshape(-1, 3)
+        X = img.reshape(-1, 3)
 
         def lab_quantize(hist, x):
             l = np.floor(x[0] / 256.0 * HIST_BINS).astype(int)
@@ -67,23 +67,23 @@ class DominantColorsResource(object):
             b = np.floor(x[2] / 256.0 * HIST_BINS).astype(int)
             return hist[l, a, b]
 
-        hist_weights = np.apply_along_axis(lambda x: lab_quantize(hist, x), 1, ar)
+        hist_weights = np.apply_along_axis(lambda x: lab_quantize(hist, x), 1, X)
 
-        n_centroids = ncenters if ncenters > ncolors else ncolors
-        num_colors = ncolors
+        n_clusters = nclusters if nclusters > ncolors else ncolors
+        n_colors = ncolors
 
-        km = KMeans(n_clusters=n_centroids, init='k-means++', n_init=5, random_state=0)
-        clusters = km.fit_predict(ar)
-        centroids = km.cluster_centers_
+        km = KMeans(n_clusters=n_clusters, init='k-means++', n_init=5, random_state=0)
+        labels = km.fit_predict(X)
+        cluster_centers = km.cluster_centers_
 
         alpha = 0.5
-        dominants = np.zeros((n_centroids, 3))
-        counts = np.zeros(n_centroids)
+        dominants = np.zeros((n_clusters, 3))
+        counts = np.zeros(n_clusters)
 
-        for i, centroid in enumerate(centroids):
+        for i, centroid in enumerate(cluster_centers):
             c_i = np.reshape(centroid, (1, 3))
-            members = ar[np.where(clusters == i)]
-            members_weights = hist_weights[np.where(clusters == i)]
+            members = X[np.where(labels == i)]
+            members_weights = hist_weights[np.where(labels == i)]
             distances = euclidean_distances(c_i, members)
             index = np.argmax(
                 alpha * (
@@ -97,7 +97,7 @@ class DominantColorsResource(object):
             dominants[i, :] = d_i
             counts[i] = lab_quantize(hist, d_i)
 
-        dominants = dominants[np.argsort(counts, axis=0)[::-1]][:num_colors]
+        dominants = dominants[np.argsort(counts, axis=0)[::-1]][:n_colors]
 
         # rescale
         dominants[:, 0] *= 100 / 255.0
@@ -108,7 +108,7 @@ class DominantColorsResource(object):
         return colors
 
     @staticmethod
-    def hsv_method(img, ncenters, ncolors):
+    def hsv_method(img, nclusters, ncolors):
         img = cv2.resize(np.array(img), (224, 224), interpolation=cv2.INTER_AREA)
         img = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
 
@@ -125,7 +125,7 @@ class DominantColorsResource(object):
         cv2.normalize(hist, hist, 0, 1, cv2.NORM_MINMAX)
 
         # make img array for kmeans
-        ar = img.reshape(-1, 3)
+        X = img.reshape(-1, 3)
 
         def hsv_quantize(hist, x):
             h = np.floor(x[0] / 180.0 * HIST_BINS).astype(int)
@@ -133,23 +133,23 @@ class DominantColorsResource(object):
             v = np.floor(x[2] / 256.0 * HIST_BINS).astype(int)
             return hist[h, s, v]
 
-        hist_weights = np.apply_along_axis(lambda x: hsv_quantize(hist, x), 1, ar)
+        hist_weights = np.apply_along_axis(lambda x: hsv_quantize(hist, x), 1, X)
 
-        n_centroids = ncenters if ncenters > ncolors else ncolors
-        num_colors = ncolors
+        n_centroids = nclusters if nclusters > ncolors else ncolors
+        n_colors = ncolors
 
         km = KMeans(n_clusters=n_centroids, init='k-means++', n_init=5, random_state=0)
-        clusters = km.fit_predict(ar)
-        centroids = km.cluster_centers_
+        labels = km.fit_predict(X)
+        cluster_centers = km.cluster_centers_
 
         alpha = 0.5
         dominants = np.zeros((n_centroids, 3))
         counts = np.zeros(n_centroids)
 
-        for i, centroid in enumerate(centroids):
+        for i, centroid in enumerate(cluster_centers):
             c_i = np.reshape(centroid, (1, 3))
-            members = ar[np.where(clusters == i)]
-            members_weights = hist_weights[np.where(clusters == i)]
+            members = X[np.where(labels == i)]
+            members_weights = hist_weights[np.where(labels == i)]
             distances = euclidean_distances(c_i, members)
             index = np.argmax(
                 alpha * (
@@ -163,7 +163,7 @@ class DominantColorsResource(object):
             dominants[i, :] = d_i
             counts[i] = hsv_quantize(hist, d_i)
 
-        dominants = dominants[np.argsort(counts, axis=0)[::-1]][:num_colors]
+        dominants = dominants[np.argsort(counts, axis=0)[::-1]][:n_colors]
 
         # rescale
         dominants[:, 0] /= 180.0
@@ -176,7 +176,7 @@ class DominantColorsResource(object):
     def on_get(self, req, resp):
         url = req.get_param('url') or ''
         ncolors = req.get_param_as_int('ncolors') or 4
-        ncenters = req.get_param_as_int('ncenters') or ncolors
+        nclusters = req.get_param_as_int('nclusters') or ncolors
         format = req.get_param('format') or 'json'
         mode = req.get_param('mode') or 'lab'
 
@@ -187,9 +187,9 @@ class DominantColorsResource(object):
             with io.BytesIO(r.content) as f:
                 img = Image.open(f)
                 if mode == 'lab':
-                    colors = self.lab_method(img, ncenters, ncolors)
+                    colors = self.lab_method(img, nclusters, ncolors)
                 else:
-                    colors = self.hsv_method(img, ncenters, ncolors)
+                    colors = self.hsv_method(img, nclusters, ncolors)
 
             colors = [rgb2hex(x) for x in colors]
 
