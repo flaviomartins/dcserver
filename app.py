@@ -9,8 +9,9 @@ import falcon
 import plac
 import numpy as np
 from PIL import Image
-from skimage.color import lab2rgb, hsv2rgb
-import cv2
+from skimage.color import rgb2hsv, hsv2rgb
+from skimage.color import rgb2lab, lab2rgb
+from skimage.color import rgb2luv, luv2rgb
 
 from sklearn.cluster import MiniBatchKMeans
 from sklearn.metrics.pairwise import pairwise_distances_argmin_min
@@ -18,7 +19,7 @@ from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 logger = logging.getLogger(__name__)
 
 ALLOWED_ORIGINS = ['*']
-HIST_BINS = 16
+THUMBNAIL_SIZE = 224, 224
 
 
 class CorsMiddleware(object):
@@ -42,10 +43,8 @@ class DominantColorsResource(object):
         pass
 
     @staticmethod
-    def lab_method(img, n_clusters, n_colors):
-        img = np.array(img)
-        img = cv2.resize(img, (224, 224), interpolation=cv2.INTER_AREA)
-        img = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
+    def luv_method(img, n_clusters, n_colors):
+        img = rgb2luv(img)
 
         # make img array for kmeans
         X = img.reshape(-1, 3)
@@ -59,19 +58,31 @@ class DominantColorsResource(object):
         # sort colors by frequency
         dominants = cluster_centers[np.argsort(bincount, axis=0)[::-1]][:n_colors]
 
-        # rescale
-        dominants[:, 0] *= 100 / 255.0
-        dominants[:, 1] -= 128
-        dominants[:, 2] -= 128
+        colors = [luv2rgb([[x]])[0][0] for x in dominants]
+        return colors
+
+    @staticmethod
+    def lab_method(img, n_clusters, n_colors):
+        img = rgb2lab(img)
+
+        # make img array for kmeans
+        X = img.reshape(-1, 3)
+
+        n_clusters = n_clusters if n_clusters > n_colors else n_colors
+        km = MiniBatchKMeans(n_clusters=n_clusters, init='k-means++', n_init=3, random_state=0)
+        labels = km.fit_predict(X)
+        cluster_centers = km.cluster_centers_
+        bincount = np.bincount(labels)
+
+        # sort colors by frequency
+        dominants = cluster_centers[np.argsort(bincount, axis=0)[::-1]][:n_colors]
 
         colors = [lab2rgb([[x]])[0][0] for x in dominants]
         return colors
 
     @staticmethod
     def hsv_method(img, n_clusters, n_colors):
-        img = np.array(img)
-        img = cv2.resize(img, (224, 224), interpolation=cv2.INTER_AREA)
-        img = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
+        img = rgb2hsv(img)
 
         # make img array for kmeans
         X = img.reshape(-1, 3)
@@ -88,11 +99,6 @@ class DominantColorsResource(object):
         # sort colors by frequency
         dominants = 1. * X[closest][np.argsort(bincount, axis=0)[::-1]][:n_colors]
 
-        # rescale
-        dominants[:, 0] /= 180.0
-        dominants[:, 1] /= 256.0
-        dominants[:, 2] /= 256.0
-
         colors = [hsv2rgb([[x]])[0][0] for x in dominants]
         return colors
 
@@ -108,11 +114,15 @@ class DominantColorsResource(object):
             r.raise_for_status()
             r.raw.decode_content = True
             with io.BytesIO(r.content) as f:
-                img = Image.open(f)
-                if mode == 'lab':
-                    colors = self.lab_method(img, nclusters, ncolors)
-                else:
+                im = Image.open(f)
+                im.thumbnail(THUMBNAIL_SIZE, Image.ANTIALIAS)
+                img = np.array(im)
+                if mode == 'hsv':
                     colors = self.hsv_method(img, nclusters, ncolors)
+                elif mode == 'luv':
+                    colors = self.luv_method(img, nclusters, ncolors)
+                else:
+                    colors = self.lab_method(img, nclusters, ncolors)
 
             colors = [rgb2hex(x) for x in colors]
 
