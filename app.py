@@ -17,16 +17,25 @@ from sklearn.cluster import MiniBatchKMeans
 from sklearn.metrics.pairwise import pairwise_distances_argmin_min
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.FileHandler('dcserver.log'))
+logger.setLevel(logging.INFO)
 
 ALLOWED_ORIGINS = ['*']
 THUMBNAIL_SIZE = 224, 224
 
 
 class CorsMiddleware(object):
-    def process_request(self, request, response):
-        origin = request.get_header('Origin')
+
+    def process_request(self, req, resp):
+        origin = req.get_header('Origin')
         if '*' in ALLOWED_ORIGINS or origin in ALLOWED_ORIGINS:
-            response.set_header('Access-Control-Allow-Origin', origin)
+            resp.set_header('Access-Control-Allow-Origin', origin)
+
+
+class RequestLoggerMiddleware(object):
+
+    def process_request(self, req, resp):
+        logger.info('{0} {1} {2} {3}'.format(' '.join(req.access_route), req.method, req.relative_uri, resp.status[:3]))
 
 
 # snipped from matplotlib
@@ -171,7 +180,8 @@ def main(host='127.0.0.1', port=8001):
 
     # Configure your WSGI server to load "quotes.app" (app is a WSGI callable)
     app = falcon.API(middleware=[
-        CorsMiddleware()
+        CorsMiddleware(),
+        RequestLoggerMiddleware()
     ])
 
     dominant_colors = DominantColorsResource()
